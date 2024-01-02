@@ -360,7 +360,7 @@ class DeltaAnalysis(session: SparkSession)
         d
       } else if (indices.size == 1 && indices(0).deltaLog.tableExists) {
         // It is a well-defined Delta table with a schema
-        DeltaDelete(newTarget, Some(condition))
+        DeltaDelete(newTarget, condition)
       } else {
         // Not a well-defined Delta table
         throw DeltaErrors.notADeltaSourceException("DELETE", Some(d))

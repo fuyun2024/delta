@@ -376,16 +376,37 @@ trait MergeIntoMaterializeSource extends DeltaLogging {
     source.output.filter(allCols.contains(_))
   }
 
+  //  private def sourceContainsOnlyDeltaScans(source: LogicalPlan): Boolean = {
+  //    !source.exists {
+  //      case l: LogicalRelation =>
+  //        l match {
+  //          case DeltaTable(_) => false
+  //          case _ => true
+  //        }
+  //      case _: LeafNode => true // Any other LeafNode is a non Delta scan.
+  //      case _ => false
+  //    }
+  //  }
+
   private def sourceContainsOnlyDeltaScans(source: LogicalPlan): Boolean = {
-    !source.exists {
+    var containsNonDeltaScan = false
+
+    def traverseAndCheck(plan: LogicalPlan): Unit = plan match {
+      case DeltaTable(_) =>
+      // 如果是 DeltaTable，不做任何操作
       case l: LogicalRelation =>
-        l match {
-          case DeltaTable(_) => false
-          case _ => true
-        }
-      case _: LeafNode => true // Any other LeafNode is a non Delta scan.
-      case _ => false
+        // 如果是 LogicalRelation 但不是 DeltaTable，我们找到了一个非 Delta 扫描
+        containsNonDeltaScan = true
+      case _: LeafNode =>
+        // 任何其他的 LeafNode 都是一个非 Delta 扫描
+        containsNonDeltaScan = true
+      case _ =>
+        // 对于非叶子节点，递归遍历其子节点
+        plan.children.foreach(traverseAndCheck)
     }
+
+    traverseAndCheck(source)
+    !containsNonDeltaScan
   }
 
   /**

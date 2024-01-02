@@ -22,7 +22,7 @@ import java.nio.{ByteBuffer, ByteOrder}
 import scala.collection.immutable.NumericRange
 
 import com.google.common.primitives.{Ints, UnsignedInteger, UnsignedInts}
-import org.roaringbitmap.{RelativeRangeConsumer, RoaringBitmap}
+import org.roaringbitmap.RoaringBitmap
 
 /**
  * A 64-bit extension of [[RoaringBitmap]] that is optimized for cases that usually fit within
@@ -317,7 +317,7 @@ final class RoaringBitmapArray extends Equals {
    * @param length Maximum number of values to consume.
    * @param rrc Code to be executed for each present or absent value.
    */
-  def forAllInRange(start: Long, length: Int, consumer: RelativeRangeConsumer): Unit = {
+  def forAllInRange(start: Long, length: Int): Unit = {
     // This one is complicated and deserves its own PR,
     // when we actually want to enable it.
     throw new UnsupportedOperationException

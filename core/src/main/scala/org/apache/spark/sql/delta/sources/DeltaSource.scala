@@ -39,7 +39,7 @@ import org.apache.spark.sql.{DataFrame, SparkSession}
 import org.apache.spark.sql.catalyst.InternalRow
 import org.apache.spark.sql.catalyst.expressions.{Expression, Literal}
 import org.apache.spark.sql.connector.read.streaming
-import org.apache.spark.sql.connector.read.streaming.{ReadAllAvailable, ReadLimit, ReadMaxFiles, SupportsAdmissionControl, SupportsTriggerAvailableNow}
+import org.apache.spark.sql.connector.read.streaming.{ReadAllAvailable, ReadLimit, ReadMaxFiles, SupportsAdmissionControl}
 import org.apache.spark.sql.execution.streaming._
 import org.apache.spark.sql.types.StructType
 
@@ -104,7 +104,6 @@ private[delta] case class IndexedFile(
  */
 trait DeltaSourceBase extends Source
     with SupportsAdmissionControl
-    with SupportsTriggerAvailableNow
     with DeltaLogging { self: DeltaSource =>
 
   /**
@@ -161,11 +160,6 @@ trait DeltaSourceBase extends Source
   private var isLastOffsetForTriggerAvailableNowInitialized = false
 
   private var isTriggerAvailableNow = false
-
-  override def prepareForTriggerAvailableNow(): Unit = {
-    logInfo("The streaming query reports to use Trigger.AvailableNow.")
-    isTriggerAvailableNow = true
-  }
 
   /**
    * initialize the internal states for AvailableNow if this method is called first time after

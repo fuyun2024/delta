@@ -17,15 +17,13 @@
 package io.delta.tables
 
 import scala.collection.mutable
-
 import org.apache.spark.sql.delta.{DeltaErrors, DeltaTableUtils}
 import org.apache.spark.sql.delta.sources.DeltaSQLConf
 import io.delta.tables.execution._
-
 import org.apache.spark.annotation._
 import org.apache.spark.sql.SparkSession
 import org.apache.spark.sql.catalyst.TableIdentifier
-import org.apache.spark.sql.catalyst.plans.logical.{CreateTable, LogicalPlan, ReplaceTable}
+import org.apache.spark.sql.catalyst.plans.logical.{CreateTableStatement, ReplaceTableStatement}
 import org.apache.spark.sql.catalyst.util.CaseInsensitiveMap
 import org.apache.spark.sql.connector.expressions.Transform
 import org.apache.spark.sql.execution.SQLExecution
@@ -327,35 +325,37 @@ class DeltaTableBuilder private[tables](
       colNames.map(name => DeltaTableUtils.parseColToTransform(name))
     }.getOrElse(Seq.empty[Transform])
 
-    val tableSpec = org.apache.spark.sql.catalyst.plans.logical.TableSpec(
-      properties = properties,
-      provider = Some(FORMAT_NAME),
-      options = Map.empty,
-      location = location,
-      serde = None,
-      comment = tblComment,
-      external = false
-    )
 
     val stmt = builderOption match {
       case CreateTableOptions(ifNotExists) =>
-        val unresolvedTable: LogicalPlan =
-          org.apache.spark.sql.catalyst.analysis.UnresolvedDBObjectName(table, isNamespace = false)
-        CreateTable(
-          unresolvedTable,
+        CreateTableStatement(
+          table,
           StructType(columns.toSeq),
           partitioning,
-          tableSpec,
-          ifNotExists)
+          None,
+          this.properties,
+          Some(FORMAT_NAME),
+          Map.empty,
+          location,
+          tblComment,
+          None,
+          false,
+          ifNotExists
+        )
       case ReplaceTableOptions(orCreate) =>
-        val unresolvedTable: LogicalPlan =
-          org.apache.spark.sql.catalyst.analysis.UnresolvedDBObjectName(table, isNamespace = false)
-        ReplaceTable(
-          unresolvedTable,
+        ReplaceTableStatement(
+          table,
           StructType(columns.toSeq),
           partitioning,
-          tableSpec,
-          orCreate)
+          None,
+          this.properties,
+          Some(FORMAT_NAME),
+          Map.empty,
+          location,
+          tblComment,
+          None,
+          orCreate
+        )
     }
     val qe = spark.sessionState.executePlan(stmt)
     // call `QueryExecution.toRDD` to trigger the execution of commands.

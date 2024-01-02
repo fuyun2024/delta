@@ -196,14 +196,6 @@ class DeltaCatalog extends DelegatingCatalogExtension
     }
   }
 
-  override def loadTable(ident: Identifier, timestamp: Long): Table = {
-    loadTableWithTimeTravel(ident, version = None, Some(timestamp))
-  }
-
-  override def loadTable(ident: Identifier, version: String): Table = {
-    loadTableWithTimeTravel(ident, Some(version), timestamp = None)
-  }
-
   /**
    * Helper method which loads a Delta table with given time travel parameters.
    * Exactly one of the timetravel parameters (version or timestamp) must be present.
@@ -230,8 +222,8 @@ class DeltaCatalog extends DelegatingCatalogExtension
 
         deltaTable.withOptions(ttOpts)
       // punt this problem up to the parent
-      case _ if version.isDefined => super.loadTable(ident, version.get)
-      case _ if timestamp.isDefined => super.loadTable(ident, timestamp.get)
+      case _ if version.isDefined => super.loadTable(ident)
+      case _ if timestamp.isDefined => super.loadTable(ident)
     }
   }
 

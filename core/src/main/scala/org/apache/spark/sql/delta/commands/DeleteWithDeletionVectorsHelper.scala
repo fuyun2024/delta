@@ -17,9 +17,7 @@
 package org.apache.spark.sql.delta.commands
 
 import java.util.UUID
-
 import scala.collection.generic.Sizing
-
 import org.apache.spark.sql.catalyst.expressions.aggregation.BitmapAggregator
 import org.apache.spark.sql.delta.{DeltaLog, DeltaParquetFileFormat, OptimisticTransaction}
 import org.apache.spark.sql.delta.DeltaParquetFileFormat._
@@ -32,12 +30,11 @@ import org.apache.spark.sql.delta.util.{DeltaEncoder, JsonUtils, PathWithFileSys
 import org.apache.spark.sql.delta.util.DeltaFileOperations.absolutePath
 import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs.Path
-
 import org.apache.spark.sql.{Column, DataFrame, Dataset, Encoder, SparkSession}
 import org.apache.spark.sql.catalyst.expressions.{AttributeReference, Expression}
 import org.apache.spark.sql.catalyst.plans.logical.{LogicalPlan, Project}
+import org.apache.spark.sql.delta.commands.DeleteWithDeletionVectorsHelper.{FILE_PATH, METADATA_NAME}
 import org.apache.spark.sql.execution.datasources.{HadoopFsRelation, LogicalRelation}
-import org.apache.spark.sql.execution.datasources.FileFormat.{FILE_PATH, METADATA_NAME}
 import org.apache.spark.sql.functions.{col, lit}
 import org.apache.spark.sql.types.StructType
 import org.apache.spark.util.{SerializableConfiguration, Utils => SparkUtils}
@@ -47,6 +44,11 @@ import org.apache.spark.util.{SerializableConfiguration, Utils => SparkUtils}
  * Contains utility classes and method to delete rows in a table using the Deletion Vectors.
  */
 object DeleteWithDeletionVectorsHelper extends DeltaCommand {
+
+  val FILE_PATH = "file_path"
+
+  val METADATA_NAME = "_metadata"
+
   /**
    * Creates a DataFrame that can be used to scan for rows matching DELETE condition in given
    * files. Generally the given file list is a pruned file list using the stats based pruning.
