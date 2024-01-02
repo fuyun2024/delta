@@ -184,6 +184,6 @@ if __name__ == "__main__":
         help="Force the generation even if already generated, useful for testing.")
     args = parser.parse_args()
 
-    if args.force or not iceberg_jars_exists():
-        prepare_iceberg_source()
-        generate_iceberg_jars()
+    # if args.force or not iceberg_jars_exists():
+    #     prepare_iceberg_source()
+    #     generate_iceberg_jars()
