@@ -267,19 +267,6 @@ class DeltaCatalog extends DelegatingCatalogExtension
       super.createTable(ident, schema, partitions, properties)
   }
 
-
-  override def createTable(
-      ident: Identifier,
-      columns: Array[org.apache.spark.sql.connector.catalog.Column],
-      partitions: Array[Transform],
-      properties: util.Map[String, String]): Table = {
-    createTable(
-      ident,
-      org.apache.spark.sql.connector.catalog.CatalogV2Util.v2ColumnsToStructType(columns),
-      partitions,
-      properties)
-  }
-
   override def createTable(
       ident: Identifier,
       schema: StructType,
@@ -576,9 +563,9 @@ class DeltaCatalog extends DelegatingCatalogExtension
         Option(col.comment()).foreach { comment =>
           field = field.withComment(comment)
         }
-        Option(col.defaultValue()).foreach { defValue =>
-          field = field.withCurrentDefaultValue(defValue.getSql)
-        }
+        // Option(col.defaultValue()).foreach { defValue =>
+        //  field = field.withCurrentDefaultValue(defValue.getSql)
+        // }
         field
       }
       AlterTableReplaceColumnsDeltaCommand(tableToUpdate, structFields).run(spark)
@@ -601,8 +588,7 @@ class DeltaCatalog extends DelegatingCatalogExtension
               col.dataType(),
               col.isNullable,
               Option(col.comment()),
-              Option(col.position()).map(UnresolvedFieldPosition),
-              Option(col.defaultValue()).map(_.getSql())
+              Option(col.position()).map(UnresolvedFieldPosition)
             )
           }).run(spark)
 

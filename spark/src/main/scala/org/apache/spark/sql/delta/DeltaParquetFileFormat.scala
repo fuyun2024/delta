@@ -216,7 +216,7 @@ case class DeltaParquetFileFormat(
       isRowDeletedColumn: Option[ColumnMetadata],
       rowIndexColumn: Option[ColumnMetadata],
       useOffHeapBuffers: Boolean): Iterator[Object] = {
-    val pathUri = partitionedFile.pathUri
+    val pathUri = new URI(partitionedFile.filePath)
 
     val rowIndexFilter = isRowDeletedColumn.map { col =>
       // Fetch the DV descriptor from the broadcast map and create a row index filter

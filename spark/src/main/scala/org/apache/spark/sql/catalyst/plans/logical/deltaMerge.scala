@@ -433,10 +433,7 @@ object DeltaMergeInto {
         // Note: This will throw error only on unresolved attribute issues,
         // not other resolution errors like mismatched data types.
         val cols = "columns " + plans.flatMap(_.output).map(_.sql).mkString(", ")
-        throw new DeltaAnalysisException(
-          errorClass = "DELTA_MERGE_UNRESOLVED_EXPRESSION",
-          messageParameters = Array(a.sql, mergeClauseType, cols),
-          origin = Some(a.origin))
+        a.failAnalysis(msg = s"cannot resolve ${a.sql} in $mergeClauseType given $cols")
       }
     }
 
@@ -556,8 +553,7 @@ object DeltaMergeInto {
             Seq(d)
 
           case _ =>
-            action.failAnalysis("INTERNAL_ERROR",
-              Map("message" -> s"Unexpected action expression '$action' in clause $clause"))
+            action.failAnalysis(msg = s"Unexpected action expression '$action' in clause $clause")
         }
       }
 
@@ -651,12 +647,9 @@ object DeltaMergeInto {
     if (resolvedMerge.missingInput.nonEmpty) {
       val missingAttributes = resolvedMerge.missingInput.mkString(",")
       val input = resolvedMerge.inputSet.mkString(",")
-      throw new DeltaAnalysisException(
-        errorClass = "DELTA_MERGE_RESOLVED_ATTRIBUTE_MISSING_FROM_INPUT",
-        messageParameters = Array(missingAttributes, input,
-          resolvedMerge.simpleString(SQLConf.get.maxToStringFields)),
-        origin = Some(resolvedMerge.origin)
-      )
+      val msgForMissingAttributes = s"Resolved attribute(s) $missingAttributes missing " +
+        s"from $input in operator ${resolvedMerge.simpleString(SQLConf.get.maxToStringFields)}."
+      resolvedMerge.failAnalysis(msg = msgForMissingAttributes)
     }
 
     resolvedMerge

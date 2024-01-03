@@ -340,7 +340,8 @@ class DeltaTableBuilder private[tables](
 
     val stmt = builderOption match {
       case CreateTableOptions(ifNotExists) =>
-        val unresolvedTable = org.apache.spark.sql.catalyst.analysis.UnresolvedIdentifier(table)
+        val unresolvedTable: LogicalPlan =
+          org.apache.spark.sql.catalyst.analysis.UnresolvedDBObjectName(table, isNamespace = false)
         CreateTable(
           unresolvedTable,
           StructType(columns.toSeq),
@@ -348,7 +349,8 @@ class DeltaTableBuilder private[tables](
           tableSpec,
           ifNotExists)
       case ReplaceTableOptions(orCreate) =>
-        val unresolvedTable = org.apache.spark.sql.catalyst.analysis.UnresolvedIdentifier(table)
+        val unresolvedTable: LogicalPlan =
+          org.apache.spark.sql.catalyst.analysis.UnresolvedDBObjectName(table, isNamespace = false)
         ReplaceTable(
           unresolvedTable,
           StructType(columns.toSeq),

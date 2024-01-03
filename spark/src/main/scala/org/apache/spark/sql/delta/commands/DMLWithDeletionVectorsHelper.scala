@@ -79,8 +79,7 @@ object DMLWithDeletionVectorsHelper extends DeltaCommand {
   private def replaceFileIndex(target: LogicalPlan, fileIndex: TahoeFileIndex): LogicalPlan = {
     val additionalCols = Seq(
       AttributeReference(ROW_INDEX_COLUMN_NAME, ROW_INDEX_STRUCT_FILED.dataType)(),
-      // TODO: when upgrading to Spark 3.5 or 4.0 this should be FileFormat.createFileMetadataCol
-      FileSourceMetadataAttribute(FileFormat.METADATA_NAME, FileFormat.BASE_METADATA_STRUCT)
+      FileFormat.createFileMetadataCol
     )
 
     val newTarget = target transformDown {

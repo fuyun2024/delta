@@ -311,10 +311,10 @@ class DeltaAnalysis(session: SparkSession)
             cloneStatement)
 
         case u: UnresolvedRelation =>
-          u.tableNotFound(u.multipartIdentifier)
+          u.failAnalysis(msg = s"Table not found: ${u.multipartIdentifier.quoted}")
 
         case TimeTravel(u: UnresolvedRelation, _, _, _) =>
-          u.tableNotFound(u.multipartIdentifier)
+          u.failAnalysis(msg = s"Table not found: ${u.multipartIdentifier.quoted}")
 
         case LogicalRelation(
             HadoopFsRelation(location, _, _, _, _: ParquetFileFormat, _), _, catalogTable, _) =>
@@ -390,10 +390,10 @@ class DeltaAnalysis(session: SparkSession)
           RestoreTableCommand(traveledTable)
 
         case u: UnresolvedRelation =>
-          u.tableNotFound(u.multipartIdentifier)
+          u.failAnalysis(msg = s"Table not found: ${u.multipartIdentifier.quoted}")
 
         case TimeTravel(u: UnresolvedRelation, _, _, _) =>
-          u.tableNotFound(u.multipartIdentifier)
+          u.failAnalysis(msg = s"Table not found: ${u.multipartIdentifier.quoted}")
 
         case _ =>
           throw DeltaErrors.notADeltaTableException("RESTORE")
@@ -499,7 +499,7 @@ class DeltaAnalysis(session: SparkSession)
             s"${other.prettyName} clauses cannot be part of the WHEN NOT MATCHED clause in MERGE " +
              "INTO.")
       }
-      val notMatchedBySourceActions = merge.notMatchedBySourceActions.map {
+      val notMatchedBySourceActions = merge.notMatchedActions.map {
         case update: UpdateAction =>
           DeltaMergeIntoNotMatchedBySourceUpdateClause(
             update.condition,
@@ -969,9 +969,7 @@ class DeltaAnalysis(session: SparkSession)
           Cast(input, dt, Option(timeZone), ansiEnabled = false)
       case SQLConf.StoreAssignmentPolicy.ANSI =>
         (input: Expression, dt: DataType, name: String) => {
-          val cast = Cast(input, dt, Option(timeZone), ansiEnabled = true)
-          cast.setTagValue(Cast.BY_TABLE_INSERTION, ())
-          TableOutputResolver.checkCastOverflowInTableInsert(cast, name)
+          AnsiCast(input, dt, Option(timeZone))
         }
       case SQLConf.StoreAssignmentPolicy.STRICT =>
         (input: Expression, dt: DataType, _) =>
@@ -1213,8 +1211,6 @@ case class DeltaDynamicPartitionOverwriteCommand(
   override def withNewTable(newTable: NamedRelation): DeltaDynamicPartitionOverwriteCommand = {
     copy(table = newTable)
   }
-
-  override def storeAnalyzedQuery(): Command = copy(analyzedQuery = Some(query))
 
   override protected def withNewChildInternal(
       newChild: LogicalPlan): DeltaDynamicPartitionOverwriteCommand = copy(query = newChild)

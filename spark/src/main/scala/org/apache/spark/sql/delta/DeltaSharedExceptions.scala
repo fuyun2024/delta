@@ -25,16 +25,10 @@ import org.apache.spark.sql.catalyst.parser.{ParseException, ParserUtils}
 import org.apache.spark.sql.catalyst.trees.Origin
 
 class DeltaAnalysisException(
-    errorClass: String,
-    messageParameters: Array[String],
-    cause: Option[Throwable] = None,
-    origin: Option[Origin] = None)
+    errorClass: String, messageParameters: Array[String], cause: Option[Throwable] = None)
   extends AnalysisException(
-    message = DeltaThrowableHelper.getMessage(errorClass, messageParameters),
+    DeltaThrowableHelper.getMessage(errorClass, messageParameters),
     errorClass = Some(errorClass),
-    line = origin.flatMap(_.line),
-    startPosition = origin.flatMap(_.startPosition),
-    context = origin.map(_.getQueryContext).getOrElse(Array.empty),
     cause = cause)
   with DeltaThrowable {
   def getMessageParametersArray: Array[String] = messageParameters
@@ -50,7 +44,8 @@ class DeltaIllegalArgumentException(
     override def getErrorClass: String = errorClass
   def getMessageParametersArray: Array[String] = messageParameters
 
-  override def getMessageParameters: java.util.Map[String, String] = {
+  def getMessageParameters: java.util.Map[String, String] = {
+    //  todo SparkThrowable.getMessageParameters 在高版本 spark 3.4 中有这个 API ，但是 3.3 中没有.
     DeltaThrowableHelper.getParameterNames(errorClass, errorSubClass = null)
       .zip(messageParameters).toMap.asJava
   }
@@ -65,7 +60,7 @@ class DeltaUnsupportedOperationException(
   override def getErrorClass: String = errorClass
   def getMessageParametersArray: Array[String] = messageParameters
 
-  override def getMessageParameters: java.util.Map[String, String] = {
+  def getMessageParameters: java.util.Map[String, String] = {
     DeltaThrowableHelper.getParameterNames(errorClass, errorSubClass = null)
       .zip(messageParameters).toMap.asJava
   }
@@ -86,6 +81,6 @@ class DeltaArithmeticException(
     messageParameters: Map[String, String]) extends ArithmeticException with DeltaThrowable {
   override def getErrorClass: String = errorClass
 
-  override def getMessageParameters: java.util.Map[String, String] = messageParameters.asJava
+  def getMessageParameters: java.util.Map[String, String] = messageParameters.asJava
 }
 

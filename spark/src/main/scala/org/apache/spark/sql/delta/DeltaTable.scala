@@ -30,7 +30,6 @@ import org.apache.spark.sql.catalyst.analysis.{NoSuchTableException, UnresolvedT
 import org.apache.spark.sql.catalyst.catalog.{CatalogTable, SessionCatalog}
 import org.apache.spark.sql.catalyst.expressions._
 import org.apache.spark.sql.catalyst.expressions.objects.StaticInvoke
-import org.apache.spark.sql.catalyst.planning.NodeWithOnlyDeterministicProjectAndFilter
 import org.apache.spark.sql.catalyst.plans.logical.{Filter, LeafNode, LogicalPlan, Project}
 import org.apache.spark.sql.catalyst.util.CharVarcharCodegenUtils
 import org.apache.spark.sql.connector.catalog.Identifier
@@ -75,6 +74,14 @@ object DeltaFullTable {
     case DeltaRelation(lr) => unapply(lr)
     case _ =>
       None
+  }
+}
+
+object NodeWithOnlyDeterministicProjectAndFilter {
+  def unapply(plan: LogicalPlan): Option[LogicalPlan] = plan match {
+    case Project(projectList, child) if projectList.forall(_.deterministic) => unapply(child)
+    case Filter(cond, child) if cond.deterministic => unapply(child)
+    case _ => Some(plan)
   }
 }
 
