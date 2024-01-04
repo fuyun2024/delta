@@ -197,7 +197,7 @@ object SQLConf {
    * run unit tests (that does not involve SparkSession) in serial order.
    */
   def get: SQLConf = {
-    if (Utils.isInRunningSparkTask) {
+    if (TaskContext.get() != null) {
       val conf = existingConf.get()
       if (conf != null) {
         conf
@@ -4541,9 +4541,6 @@ class SQLConf extends Serializable with Logging {
     getConf(SQLConf.OPTIMIZE_NULL_AWARE_ANTI_JOIN)
 
   def legacyPathOptionBehavior: Boolean = getConf(SQLConf.LEGACY_PATH_OPTION_BEHAVIOR)
-
-  def disabledJdbcConnectionProviders: String = getConf(
-    StaticSQLConf.DISABLED_JDBC_CONN_PROVIDER_LIST)
 
   def charVarcharAsString: Boolean = getConf(SQLConf.LEGACY_CHAR_VARCHAR_AS_STRING)
 

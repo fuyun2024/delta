@@ -29,7 +29,6 @@ import org.apache.spark.sql.delta.catalog.DeltaTableV2
 import org.apache.spark.sql.delta.catalog.IcebergTablePlaceHolder
 import org.apache.spark.sql.delta.commands._
 import org.apache.spark.sql.delta.commands.cdc.CDCReader
-import org.apache.spark.sql.delta.constraints.{AddConstraint, DropConstraint}
 import org.apache.spark.sql.delta.files.{TahoeFileIndex, TahoeLogFileIndex}
 import org.apache.spark.sql.delta.metering.DeltaLogging
 import org.apache.spark.sql.delta.schema.SchemaUtils
@@ -90,8 +89,7 @@ class DeltaAnalysis(session: SparkSession)
     // INSERT INTO by name
     // AppendData.byName is also used for DataFrame append so we check for the SQL origin text
     // since we only want to up-cast for SQL insert into by name
-    case a @ AppendDelta(r, d) if a.isByName &&
-        a.origin.sqlText.nonEmpty && needsSchemaAdjustmentByName(a.query, r.output, d) =>
+    case a @ AppendDelta(r, d) if a.isByName && needsSchemaAdjustmentByName(a.query, r.output, d) =>
       val projection = resolveQueryColumnsByName(a.query, r.output, d)
       if (projection != a.query) {
         a.copy(query = projection)
@@ -220,8 +218,8 @@ class DeltaAnalysis(session: SparkSession)
     // INSERT OVERWRITE by name
     // OverwriteDelta.byName is also used for DataFrame append so we check for the SQL origin text
     // since we only want to up-cast for SQL insert into by name
-    case o @ OverwriteDelta(r, d) if o.isByName &&
-        o.origin.sqlText.nonEmpty && needsSchemaAdjustmentByName(o.query, r.output, d) =>
+    case o @ OverwriteDelta(r, d) if o.isByName
+      && needsSchemaAdjustmentByName(o.query, r.output, d) =>
       val projection = resolveQueryColumnsByName(o.query, r.output, d)
       if (projection != o.query) {
         val aliases = AttributeMap(o.query.output.zip(projection.output).collect {
@@ -243,8 +241,7 @@ class DeltaAnalysis(session: SparkSession)
           needsSchemaAdjustmentByOrdinal(d.name(), o.query, r.schema)) {
         // INSERT OVERWRITE by ordinal and df.insertInto()
         resolveQueryColumnsByOrdinal(o.query, r.output, d.name())
-      } else if (o.isByName && o.origin.sqlText.nonEmpty &&
-          needsSchemaAdjustmentByName(o.query, r.output, d)) {
+      } else if (o.isByName && needsSchemaAdjustmentByName(o.query, r.output, d)) {
         // INSERT OVERWRITE by name
         // OverwriteDelta.byName is also used for DataFrame append so we check for the SQL origin
         // text since we only want to up-cast for SQL insert into by name
@@ -453,7 +450,7 @@ class DeltaAnalysis(session: SparkSession)
         d
       } else if (indices.size == 1 && indices(0).deltaLog.tableExists) {
         // It is a well-defined Delta table with a schema
-        DeltaDelete(newTarget, Some(condition))
+        DeltaDelete(newTarget, condition)
       } else {
         // Not a well-defined Delta table
         throw DeltaErrors.notADeltaSourceException("DELETE", Some(d))

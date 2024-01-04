@@ -40,12 +40,8 @@ import org.apache.spark.sql.execution.datasources.v2.DataSourceV2Relation
 trait DeltaTableOperations extends AnalysisHelper { self: DeltaTable =>
 
   protected def executeDelete(condition: Option[Expression]): Unit = improveUnsupportedOpError {
-    withActiveSession(sparkSession) {
-      val delete = DeleteFromTable(
-        self.toDF.queryExecution.analyzed,
-        condition.getOrElse(Literal.TrueLiteral))
-      toDataset(sparkSession, delete)
-    }
+    val delete = DeleteFromTable(self.toDF.queryExecution.analyzed, condition)
+    toDataset(sparkSession, delete)
   }
 
   protected def executeHistory(

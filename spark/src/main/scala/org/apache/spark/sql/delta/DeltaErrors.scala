@@ -3252,7 +3252,7 @@ class DeltaIllegalStateException(
     with DeltaThrowable {
   override def getErrorClass: String = errorClass
 
-  def getMessageParameters: java.util.Map[String, String] = {
+  override def getMessageParameters: java.util.Map[String, String] = {
     DeltaThrowableHelper.getParameterNames(errorClass, null)
       .zip(messageParameters).toMap.asJava
   }
@@ -3297,7 +3297,7 @@ class DeltaRuntimeException(
     with DeltaThrowable {
   override def getErrorClass: String = errorClass
 
-  def getMessageParameters: java.util.Map[String, String] =
+  override def getMessageParameters: java.util.Map[String, String] =
     DeltaThrowableHelper.getParameterNames(errorClass, null)
       .zip(messageParameters).toMap.asJava
 }
@@ -3361,7 +3361,7 @@ class DeltaTablePropertyValidationFailedException(
     messageParameters = subClass.messageParameters(table)))
     with DeltaThrowable {
 
-  def getMessageParameters: java.util.Map[String, String] = {
+  override def getMessageParameters: java.util.Map[String, String] = {
     DeltaThrowableHelper.getParameterNames(
       "DELTA_VIOLATE_TABLE_PROPERTY_VALIDATION_FAILED",
       subClass.tag).zip(subClass.messageParameters(table)).toMap.asJava

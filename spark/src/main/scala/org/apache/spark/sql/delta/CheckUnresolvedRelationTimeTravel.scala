@@ -19,7 +19,7 @@ package org.apache.spark.sql.delta
 import org.apache.spark.sql.{AnalysisException, SparkSession}
 import org.apache.spark.sql.catalyst.analysis.{RelationTimeTravel, UnresolvedRelation}
 import org.apache.spark.sql.catalyst.plans.logical.LogicalPlan
-import org.apache.spark.sql.catalyst.trees.TreePattern.RELATION_TIME_TRAVEL
+import org.apache.spark.sql.catalyst.trees.TreePattern.REPARTITION_OPERATION
 
 /**
  * Custom check rule that compensates for [SPARK-45383]. It checks the (unresolved) child relation
@@ -28,7 +28,7 @@ import org.apache.spark.sql.catalyst.trees.TreePattern.RELATION_TIME_TRAVEL
  */
 class CheckUnresolvedRelationTimeTravel(spark: SparkSession) extends (LogicalPlan => Unit) {
   override def apply(plan: LogicalPlan): Unit = {
-    if (plan.containsPattern(RELATION_TIME_TRAVEL)) {
+    if (plan.containsPattern(REPARTITION_OPERATION)) {
       plan.foreachUp {
         case tt: RelationTimeTravel =>
           // Check if `tt.relation` is unresolved

@@ -43,7 +43,8 @@ class ErrorClassesJsonReader(jsonFileURLs: Seq[URL]) {
   def getErrorMessage(errorClass: String, messageParameters: Map[String, String]): String = {
     val messageTemplate = getMessageTemplate(errorClass)
     val sub = new StringSubstitutor(messageParameters.asJava)
-    sub.setEnableUndefinedVariableException(true)
+    // no throw IllegalArgumentException
+    // sub.setEnableUndefinedVariableException(true)
     sub.setDisableSubstitutionInValues(true)
     try {
       sub.replace(messageTemplate.replaceAll("<([a-zA-Z0-9_-]+)>", "\\$\\{$1\\}"))

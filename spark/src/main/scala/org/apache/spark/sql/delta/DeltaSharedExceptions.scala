@@ -44,7 +44,7 @@ class DeltaIllegalArgumentException(
     override def getErrorClass: String = errorClass
   def getMessageParametersArray: Array[String] = messageParameters
 
-  def getMessageParameters: java.util.Map[String, String] = {
+  override def getMessageParameters: java.util.Map[String, String] = {
     //  todo SparkThrowable.getMessageParameters 在高版本 spark 3.4 中有这个 API ，但是 3.3 中没有.
     DeltaThrowableHelper.getParameterNames(errorClass, errorSubClass = null)
       .zip(messageParameters).toMap.asJava
@@ -60,7 +60,7 @@ class DeltaUnsupportedOperationException(
   override def getErrorClass: String = errorClass
   def getMessageParametersArray: Array[String] = messageParameters
 
-  def getMessageParameters: java.util.Map[String, String] = {
+  override def getMessageParameters: java.util.Map[String, String] = {
     DeltaThrowableHelper.getParameterNames(errorClass, errorSubClass = null)
       .zip(messageParameters).toMap.asJava
   }
@@ -81,6 +81,6 @@ class DeltaArithmeticException(
     messageParameters: Map[String, String]) extends ArithmeticException with DeltaThrowable {
   override def getErrorClass: String = errorClass
 
-  def getMessageParameters: java.util.Map[String, String] = messageParameters.asJava
+  override def getMessageParameters: java.util.Map[String, String] = messageParameters.asJava
 }
 

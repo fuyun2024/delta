@@ -37,10 +37,10 @@ import org.apache.hadoop.fs.Path
 
 import org.apache.spark.paths.SparkPath
 import org.apache.spark.sql._
-import org.apache.spark.sql.catalyst.expressions.{AttributeReference, Expression, FileSourceMetadataAttribute, GenericInternalRow}
+import org.apache.spark.sql.catalyst.expressions.{AttributeReference, Expression}
 import org.apache.spark.sql.catalyst.plans.logical.{LogicalPlan, Project}
+import org.apache.spark.sql.delta.commands.DMLWithDeletionVectorsHelper.{FILE_PATH, METADATA_NAME}
 import org.apache.spark.sql.execution.datasources.{FileFormat, HadoopFsRelation, LogicalRelation}
-import org.apache.spark.sql.execution.datasources.FileFormat.{FILE_PATH, METADATA_NAME}
 import org.apache.spark.sql.functions.{col, lit}
 import org.apache.spark.sql.types.StructType
 import org.apache.spark.util.{SerializableConfiguration, Utils => SparkUtils}
@@ -51,6 +51,11 @@ import org.apache.spark.util.{SerializableConfiguration, Utils => SparkUtils}
  */
 object DMLWithDeletionVectorsHelper extends DeltaCommand {
   val SUPPORTED_DML_COMMANDS: Seq[String] = Seq("DELETE", "UPDATE")
+
+  val FILE_PATH = "file_path"
+
+  val METADATA_NAME = "_metadata"
+
 
   /**
    * Creates a DataFrame that can be used to scan for rows matching the condition in the given
@@ -78,8 +83,7 @@ object DMLWithDeletionVectorsHelper extends DeltaCommand {
    */
   private def replaceFileIndex(target: LogicalPlan, fileIndex: TahoeFileIndex): LogicalPlan = {
     val additionalCols = Seq(
-      AttributeReference(ROW_INDEX_COLUMN_NAME, ROW_INDEX_STRUCT_FILED.dataType)(),
-      FileFormat.createFileMetadataCol
+      AttributeReference(ROW_INDEX_COLUMN_NAME, ROW_INDEX_STRUCT_FILED.dataType)()
     )
 
     val newTarget = target transformDown {

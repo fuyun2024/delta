@@ -387,11 +387,24 @@ object DeltaTableUtils extends PredicateHelper
         // Spark does char type read-side padding via an additional Project over the scan node.
         // `newOutput` references the Project attributes, we need to translate their expression IDs
         // so that `newOutput` references attributes from the LogicalRelation instead.
-        def hasCharPadding(e: Expression): Boolean = e.exists {
-          case s: StaticInvoke => s.staticObject == classOf[CharVarcharCodegenUtils] &&
-            s.functionName == "readSidePadding"
-          case _ => false
+        // def hasCharPadding(e: Expression): Boolean = e.exists {
+        //  case s: StaticInvoke => s.staticObject == classOf[CharVarcharCodegenUtils] &&
+        //    s.functionName == "readSidePadding"
+        //  case _ => false
+        // }
+
+        def hasCharPadding(e: Expression): Boolean = {
+
+          def matchCondition(e: Expression): Boolean = e match {
+            case s: StaticInvoke =>
+              s.staticObject == classOf[CharVarcharCodegenUtils] &&
+                s.functionName == "readSidePadding"
+            case _ => false
+          }
+
+          matchCondition(e) || e.children.exists(hasCharPadding)
         }
+
         val charColMapping = AttributeMap(projectList.collect {
           case a: Alias if hasCharPadding(a.child) && a.references.size == 1 =>
             hasChar = true
