@@ -571,8 +571,10 @@ object Checkpoints
       .executedPlan
       .execute()
       .mapPartitions { case iter =>
-        val actualNumParts = Option(TaskContext.get).map(_.numPartitions())
-          .getOrElse(numParts)
+        // todo 我们这里需要重写 TaskContext 获取 numPartitions 方法
+        // val actualNumParts = Option(TaskContext.get).map(_.numPartitions())
+        //  .getOrElse(numParts)
+        val actualNumParts = numParts;
         val partition = TaskContext.getPartitionId()
         val (writtenPath, finalPath) = Checkpoints.getCheckpointWritePath(
           serConf.value,
@@ -842,7 +844,8 @@ object Checkpoints
       .executedPlan
       .execute()
       .mapPartitions { iter =>
-        val actualNumParts = Option(TaskContext.get).map(_.numPartitions()).getOrElse(1)
+        // val actualNumParts = Option(TaskContext.get).map(_.numPartitions()).getOrElse(1)
+        val actualNumParts = 1;
         require(actualNumParts == 1, "The parquet V2 checkpoint must be written in 1 file")
         val partition = TaskContext.getPartitionId()
         val finalPath = finalSparkPath.toPath

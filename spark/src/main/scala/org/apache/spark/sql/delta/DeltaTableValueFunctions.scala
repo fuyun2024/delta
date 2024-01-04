@@ -28,10 +28,9 @@ import org.apache.spark.sql.delta.sources.DeltaDataSource
 
 import org.apache.spark.sql.SparkSession
 import org.apache.spark.sql.catalyst.FunctionIdentifier
-import org.apache.spark.sql.catalyst.analysis.{FunctionRegistryBase, NamedRelation, TableFunctionRegistry, UnresolvedLeafNode, UnresolvedRelation}
+import org.apache.spark.sql.catalyst.analysis.{FunctionRegistryBase, NamedRelation, TableFunctionRegistry, UnresolvedRelation}
 import org.apache.spark.sql.catalyst.expressions.{Attribute, Expression, ExpressionInfo, StringLiteral}
 import org.apache.spark.sql.catalyst.plans.logical.{LeafNode, LogicalPlan, UnaryNode}
-import org.apache.spark.sql.connector.catalog.V1Table
 import org.apache.spark.sql.execution.datasources.LogicalRelation
 import org.apache.spark.sql.execution.datasources.v2.DataSourceV2Relation
 import org.apache.spark.sql.types.{IntegerType, LongType, StringType, TimestampType}
@@ -71,9 +70,12 @@ object DeltaTableValueFunctions {
 /**
  * Represents an unresolved Delta Table Value Function
  */
-trait DeltaTableValueFunction extends UnresolvedLeafNode {
+trait DeltaTableValueFunction extends LeafNode {
   def fnName: String
   val functionArgs: Seq[Expression]
+
+  override def output: Seq[Attribute] = Nil
+  override lazy val resolved = false
 }
 
 /**

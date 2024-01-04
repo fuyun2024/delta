@@ -209,11 +209,11 @@ class DeltaCatalog extends DelegatingCatalogExtension
     }
   }
 
-  override def loadTable(ident: Identifier, timestamp: Long): Table = {
+  def loadTable(ident: Identifier, timestamp: Long): Table = {
     loadTableWithTimeTravel(ident, version = None, Some(timestamp))
   }
 
-  override def loadTable(ident: Identifier, version: String): Table = {
+  def loadTable(ident: Identifier, version: String): Table = {
     loadTableWithTimeTravel(ident, Some(version), timestamp = None)
   }
 
@@ -243,8 +243,8 @@ class DeltaCatalog extends DelegatingCatalogExtension
 
         deltaTable.withOptions(ttOpts)
       // punt this problem up to the parent
-      case _ if version.isDefined => super.loadTable(ident, version.get)
-      case _ if timestamp.isDefined => super.loadTable(ident, timestamp.get)
+      case _ if version.isDefined => super.loadTable(ident)
+      case _ if timestamp.isDefined => super.loadTable(ident)
     }
   }
 
@@ -265,19 +265,6 @@ class DeltaCatalog extends DelegatingCatalogExtension
       properties: util.Map[String, String]
   ): Table = {
       super.createTable(ident, schema, partitions, properties)
-  }
-
-
-  override def createTable(
-      ident: Identifier,
-      columns: Array[org.apache.spark.sql.connector.catalog.Column],
-      partitions: Array[Transform],
-      properties: util.Map[String, String]): Table = {
-    createTable(
-      ident,
-      org.apache.spark.sql.connector.catalog.CatalogV2Util.v2ColumnsToStructType(columns),
-      partitions,
-      properties)
   }
 
   override def createTable(
@@ -576,9 +563,9 @@ class DeltaCatalog extends DelegatingCatalogExtension
         Option(col.comment()).foreach { comment =>
           field = field.withComment(comment)
         }
-        Option(col.defaultValue()).foreach { defValue =>
-          field = field.withCurrentDefaultValue(defValue.getSql)
-        }
+        // Option(col.defaultValue()).foreach { defValue =>
+        //  field = field.withCurrentDefaultValue(defValue.getSql)
+        // }
         field
       }
       AlterTableReplaceColumnsDeltaCommand(tableToUpdate, structFields).run(spark)
@@ -601,8 +588,7 @@ class DeltaCatalog extends DelegatingCatalogExtension
               col.dataType(),
               col.isNullable,
               Option(col.comment()),
-              Option(col.position()).map(UnresolvedFieldPosition),
-              Option(col.defaultValue()).map(_.getSql())
+              Option(col.position()).map(UnresolvedFieldPosition)
             )
           }).run(spark)
 

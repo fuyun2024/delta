@@ -29,7 +29,6 @@ import org.apache.spark.sql.delta.catalog.DeltaTableV2
 import org.apache.spark.sql.delta.catalog.IcebergTablePlaceHolder
 import org.apache.spark.sql.delta.commands._
 import org.apache.spark.sql.delta.commands.cdc.CDCReader
-import org.apache.spark.sql.delta.constraints.{AddConstraint, DropConstraint}
 import org.apache.spark.sql.delta.files.{TahoeFileIndex, TahoeLogFileIndex}
 import org.apache.spark.sql.delta.metering.DeltaLogging
 import org.apache.spark.sql.delta.schema.SchemaUtils
@@ -50,8 +49,6 @@ import org.apache.spark.sql.catalyst.plans.logical.CloneTableStatement
 import org.apache.spark.sql.catalyst.plans.logical.RestoreTableStatement
 import org.apache.spark.sql.catalyst.rules.Rule
 import org.apache.spark.sql.catalyst.streaming.WriteToStream
-import org.apache.spark.sql.catalyst.types.DataTypeUtils.toAttribute
-import org.apache.spark.sql.catalyst.types.DataTypeUtils.toAttributes
 import org.apache.spark.sql.catalyst.util.CaseInsensitiveMap
 import org.apache.spark.sql.connector.catalog.{Identifier, TableCatalog}
 import org.apache.spark.sql.connector.catalog.CatalogV2Implicits._
@@ -92,8 +89,7 @@ class DeltaAnalysis(session: SparkSession)
     // INSERT INTO by name
     // AppendData.byName is also used for DataFrame append so we check for the SQL origin text
     // since we only want to up-cast for SQL insert into by name
-    case a @ AppendDelta(r, d) if a.isByName &&
-        a.origin.sqlText.nonEmpty && needsSchemaAdjustmentByName(a.query, r.output, d) =>
+    case a @ AppendDelta(r, d) if a.isByName && needsSchemaAdjustmentByName(a.query, r.output, d) =>
       val projection = resolveQueryColumnsByName(a.query, r.output, d)
       if (projection != a.query) {
         a.copy(query = projection)
@@ -222,8 +218,8 @@ class DeltaAnalysis(session: SparkSession)
     // INSERT OVERWRITE by name
     // OverwriteDelta.byName is also used for DataFrame append so we check for the SQL origin text
     // since we only want to up-cast for SQL insert into by name
-    case o @ OverwriteDelta(r, d) if o.isByName &&
-        o.origin.sqlText.nonEmpty && needsSchemaAdjustmentByName(o.query, r.output, d) =>
+    case o @ OverwriteDelta(r, d) if o.isByName
+      && needsSchemaAdjustmentByName(o.query, r.output, d) =>
       val projection = resolveQueryColumnsByName(o.query, r.output, d)
       if (projection != o.query) {
         val aliases = AttributeMap(o.query.output.zip(projection.output).collect {
@@ -245,8 +241,7 @@ class DeltaAnalysis(session: SparkSession)
           needsSchemaAdjustmentByOrdinal(d.name(), o.query, r.schema)) {
         // INSERT OVERWRITE by ordinal and df.insertInto()
         resolveQueryColumnsByOrdinal(o.query, r.output, d.name())
-      } else if (o.isByName && o.origin.sqlText.nonEmpty &&
-          needsSchemaAdjustmentByName(o.query, r.output, d)) {
+      } else if (o.isByName && needsSchemaAdjustmentByName(o.query, r.output, d)) {
         // INSERT OVERWRITE by name
         // OverwriteDelta.byName is also used for DataFrame append so we check for the SQL origin
         // text since we only want to up-cast for SQL insert into by name
@@ -313,10 +308,10 @@ class DeltaAnalysis(session: SparkSession)
             cloneStatement)
 
         case u: UnresolvedRelation =>
-          u.tableNotFound(u.multipartIdentifier)
+          u.failAnalysis(msg = s"Table not found: ${u.multipartIdentifier.quoted}")
 
         case TimeTravel(u: UnresolvedRelation, _, _, _) =>
-          u.tableNotFound(u.multipartIdentifier)
+          u.failAnalysis(msg = s"Table not found: ${u.multipartIdentifier.quoted}")
 
         case LogicalRelation(
             HadoopFsRelation(location, _, _, _, _: ParquetFileFormat, _), _, catalogTable, _) =>
@@ -392,10 +387,10 @@ class DeltaAnalysis(session: SparkSession)
           RestoreTableCommand(traveledTable)
 
         case u: UnresolvedRelation =>
-          u.tableNotFound(u.multipartIdentifier)
+          u.failAnalysis(msg = s"Table not found: ${u.multipartIdentifier.quoted}")
 
         case TimeTravel(u: UnresolvedRelation, _, _, _) =>
-          u.tableNotFound(u.multipartIdentifier)
+          u.failAnalysis(msg = s"Table not found: ${u.multipartIdentifier.quoted}")
 
         case _ =>
           throw DeltaErrors.notADeltaTableException("RESTORE")
@@ -455,7 +450,7 @@ class DeltaAnalysis(session: SparkSession)
         d
       } else if (indices.size == 1 && indices(0).deltaLog.tableExists) {
         // It is a well-defined Delta table with a schema
-        DeltaDelete(newTarget, Some(condition))
+        DeltaDelete(newTarget, condition)
       } else {
         // Not a well-defined Delta table
         throw DeltaErrors.notADeltaSourceException("DELETE", Some(d))
@@ -501,7 +496,7 @@ class DeltaAnalysis(session: SparkSession)
             s"${other.prettyName} clauses cannot be part of the WHEN NOT MATCHED clause in MERGE " +
              "INTO.")
       }
-      val notMatchedBySourceActions = merge.notMatchedBySourceActions.map {
+      val notMatchedBySourceActions = merge.notMatchedActions.map {
         case update: UpdateAction =>
           DeltaMergeIntoNotMatchedBySourceUpdateClause(
             update.condition,
@@ -971,9 +966,7 @@ class DeltaAnalysis(session: SparkSession)
           Cast(input, dt, Option(timeZone), ansiEnabled = false)
       case SQLConf.StoreAssignmentPolicy.ANSI =>
         (input: Expression, dt: DataType, name: String) => {
-          val cast = Cast(input, dt, Option(timeZone), ansiEnabled = true)
-          cast.setTagValue(Cast.BY_TABLE_INSERTION, ())
-          TableOutputResolver.checkCastOverflowInTableInsert(cast, name)
+          AnsiCast(input, dt, Option(timeZone))
         }
       case SQLConf.StoreAssignmentPolicy.STRICT =>
         (input: Expression, dt: DataType, _) =>
@@ -1138,7 +1131,7 @@ object DeltaRelation extends DeltaLogging {
       val relation = d.withOptions(options.asScala.toMap).toBaseRelation
       val output = if (CDCReader.isCDCRead(options)) {
         // Handles cdc for the spark.read.options().table() code path
-        toAttributes(relation.schema)
+        relation.schema.toAttributes
       } else {
         v2Relation.output
       }
@@ -1215,8 +1208,6 @@ case class DeltaDynamicPartitionOverwriteCommand(
   override def withNewTable(newTable: NamedRelation): DeltaDynamicPartitionOverwriteCommand = {
     copy(table = newTable)
   }
-
-  override def storeAnalyzedQuery(): Command = copy(analyzedQuery = Some(query))
 
   override protected def withNewChildInternal(
       newChild: LogicalPlan): DeltaDynamicPartitionOverwriteCommand = copy(query = newChild)
