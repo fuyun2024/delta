@@ -35,7 +35,7 @@ val default_scala_version = settingKey[String]("Default Scala version")
 Global / default_scala_version := scala212
 
 // Dependent library versions
-val sparkVersion = "3.5.0"
+val sparkVersion = "3.2.1"
 val flinkVersion = "1.16.1"
 val hadoopVersion = "3.3.1"
 val scalaTestVersion = "3.2.15"
@@ -117,6 +117,7 @@ lazy val spark = (project in file("spark"))
     ),
     // For adding staged Spark RC versions, Ex:
     // resolvers += "Apche Spark 3.5.0 (RC1) Staging" at "https://repository.apache.org/content/repositories/orgapachespark-1444/",
+    resolvers += "Local Maven Repository" at "file:///opt/app/repo/",
 
     Compile / packageBin / mappings := (Compile / packageBin / mappings).value ++
         listPythonFiles(baseDirectory.value.getParentFile / "python"),
@@ -320,141 +321,165 @@ lazy val storageS3DynamoDB = (project in file("storage-s3-dynamodb"))
     )
   ).configureUnidoc()
 
-val icebergSparkRuntimeArtifactName = {
- val (expMaj, expMin, _) = getMajorMinorPatch(sparkVersion)
- s"iceberg-spark-runtime-$expMaj.$expMin"
-}
+//val icebergSparkRuntimeArtifactName = {
+// val (expMaj, expMin, _) = getMajorMinorPatch(sparkVersion)
+// s"iceberg-spark-runtime-$expMaj.$expMin"
+//}
 
-lazy val testDeltaIcebergJar = (project in file("testDeltaIcebergJar"))
-  // delta-iceberg depends on delta-spark! So, we need to include it during our test.
-  .dependsOn(spark % "test")
-  .settings(
-    name := "test-delta-iceberg-jar",
-    commonSettings,
-    skipReleaseSettings,
-    exportJars := true,
-    Compile / unmanagedJars += (iceberg / assembly).value,
-    libraryDependencies ++= Seq(
-      "org.apache.hadoop" % "hadoop-client" % hadoopVersion,
-      "org.scalatest" %% "scalatest" % scalaTestVersion % "test",
-      "org.apache.spark" %% "spark-core" % sparkVersion % "test"
-    )
-  )
+//lazy val testDeltaIcebergJar = (project in file("testDeltaIcebergJar"))
+//  // delta-iceberg depends on delta-spark! So, we need to include it during our test.
+//  .dependsOn(spark % "test")
+//  .settings(
+//    name := "test-delta-iceberg-jar",
+//    commonSettings,
+//    skipReleaseSettings,
+//    exportJars := true,
+//    Compile / unmanagedJars += (iceberg / assembly).value,
+//    libraryDependencies ++= Seq(
+//      "org.apache.hadoop" % "hadoop-client" % hadoopVersion,
+//      "org.scalatest" %% "scalatest" % scalaTestVersion % "test",
+//      "org.apache.spark" %% "spark-core" % sparkVersion % "test"
+//    )
+//  )
 
-val deltaIcebergSparkIncludePrefixes = Seq(
-  // We want everything from this package
-  "org/apache/spark/sql/delta/icebergShaded",
-
-  // We only want the files in this project from this package. e.g. we want to exclude
-  // org/apache/spark/sql/delta/commands/convert/ConvertTargetFile.class (from delta-spark project).
-  "org/apache/spark/sql/delta/commands/convert/IcebergFileManifest",
-  "org/apache/spark/sql/delta/commands/convert/IcebergSchemaUtils",
-  "org/apache/spark/sql/delta/commands/convert/IcebergTable"
-)
+//val deltaIcebergSparkIncludePrefixes = Seq(
+//  // We want everything from this package
+//  "org/apache/spark/sql/delta/icebergShaded",
+//
+//  // We only want the files in this project from this package. e.g. we want to exclude
+//  // org/apache/spark/sql/delta/commands/convert/ConvertTargetFile.class (from delta-spark project).
+//  "org/apache/spark/sql/delta/commands/convert/IcebergFileManifest",
+//  "org/apache/spark/sql/delta/commands/convert/IcebergSchemaUtils",
+//  "org/apache/spark/sql/delta/commands/convert/IcebergTable"
+//)
 
 // Build using: build/sbt clean icebergShaded/compile iceberg/compile
 // It will fail the first time, just re-run it.
 // scalastyle:off println
-lazy val iceberg = (project in file("iceberg"))
-  .dependsOn(spark % "compile->compile;test->test;provided->provided")
-  .settings (
-    name := "delta-iceberg",
-    commonSettings,
-    scalaStyleSettings,
-    releaseSettings,
-    libraryDependencies ++= Seq(
-      // Fix Iceberg's legacy java.lang.NoClassDefFoundError: scala/jdk/CollectionConverters$ error
-      // due to legacy scala.
-      "org.scala-lang.modules" %% "scala-collection-compat" % "2.1.1",
-      "org.apache.iceberg" %% icebergSparkRuntimeArtifactName % "1.4.0" % "provided",
-      "com.github.ben-manes.caffeine" % "caffeine" % "2.9.3"
-    ),
-    Compile / unmanagedJars += (icebergShaded / assembly).value,
-    // Generate the assembly JAR as the package JAR
-    Compile / packageBin := assembly.value,
-    assembly / assemblyJarName := s"${name.value}_${scalaBinaryVersion.value}-${version.value}.jar",
-    assembly / logLevel := Level.Info,
-    assembly / test := {},
-    assembly / assemblyExcludedJars := {
-      // Note: the input here is only `libraryDependencies` jars, not `.dependsOn(_)` jars.
-      val allowedJars = Seq(
-        s"iceberg-shaded_${scalaBinaryVersion.value}-${version.value}.jar",
-        s"scala-library-${scala212}.jar",
-        s"scala-library-${scala213}.jar",
-        s"scala-collection-compat_${scalaBinaryVersion.value}-2.1.1.jar",
-        "caffeine-2.9.3.jar",
-        // Note: We are excluding
-        // - antlr4-runtime-4.9.3.jar
-        // - checker-qual-3.19.0.jar
-        // - error_prone_annotations-2.10.0.jar
-      )
-      val cp = (assembly / fullClasspath).value
-
-      // Return `true` when we want the jar `f` to be excluded from the assembly jar
-      cp.filter { f =>
-        val doExclude = !allowedJars.contains(f.data.getName)
-        println(s"Excluding jar: ${f.data.getName} ? $doExclude")
-        doExclude
-      }
-    },
-    assembly / assemblyMergeStrategy := {
-      // Project iceberg `dependsOn` spark and accidentally brings in it, along with its
-      // compile-time dependencies (like delta-storage). We want these excluded from the
-      // delta-iceberg jar.
-      case PathList("io", "delta", xs @ _*) =>
-        // - delta-storage will bring in classes: io/delta/storage
-        // - delta-spark will bring in classes: io/delta/exceptions/, io/delta/implicits,
-        //   io/delta/package, io/delta/sql, io/delta/tables,
-        println(s"Discarding class: io/delta/${xs.mkString("/")}")
-        MergeStrategy.discard
-      case PathList("com", "databricks", xs @ _*) =>
-        // delta-spark will bring in com/databricks/spark/util
-        println(s"Discarding class: com/databricks/${xs.mkString("/")}")
-        MergeStrategy.discard
-      case PathList("org", "apache", "spark", xs @ _*)
-        if !deltaIcebergSparkIncludePrefixes.exists { prefix =>
-          s"org/apache/spark/${xs.mkString("/")}".startsWith(prefix) } =>
-        println(s"Discarding class: org/apache/spark/${xs.mkString("/")}")
-        MergeStrategy.discard
-      case x =>
-        println(s"Including class: $x")
-        (assembly / assemblyMergeStrategy).value(x)
-    },
-    assemblyPackageScala / assembleArtifact := false
-  )
+//lazy val iceberg = (project in file("iceberg"))
+//  .dependsOn(spark % "compile->compile;test->test;provided->provided")
+//  .settings (
+//    name := "delta-iceberg",
+//    commonSettings,
+//    scalaStyleSettings,
+//    releaseSettings,
+//    libraryDependencies ++= Seq(
+//      // Fix Iceberg's legacy java.lang.NoClassDefFoundError: scala/jdk/CollectionConverters$ error
+//      // due to legacy scala.
+//      "org.scala-lang.modules" %% "scala-collection-compat" % "2.1.1",
+//      "org.apache.iceberg" %% icebergSparkRuntimeArtifactName % "1.4.0" % "provided",
+//      "com.github.ben-manes.caffeine" % "caffeine" % "2.9.3"
+//    ),
+//    Compile / unmanagedJars += (icebergShaded / assembly).value,
+//    // Generate the assembly JAR as the package JAR
+//    Compile / packageBin := assembly.value,
+//    assembly / assemblyJarName := s"${name.value}_${scalaBinaryVersion.value}-${version.value}.jar",
+//    assembly / logLevel := Level.Info,
+//    assembly / test := {},
+//    assembly / assemblyExcludedJars := {
+//      // Note: the input here is only `libraryDependencies` jars, not `.dependsOn(_)` jars.
+//      val allowedJars = Seq(
+//        s"iceberg-shaded_${scalaBinaryVersion.value}-${version.value}.jar",
+//        s"scala-library-${scala212}.jar",
+//        s"scala-library-${scala213}.jar",
+//        s"scala-collection-compat_${scalaBinaryVersion.value}-2.1.1.jar",
+//        "caffeine-2.9.3.jar",
+//        // Note: We are excluding
+//        // - antlr4-runtime-4.9.3.jar
+//        // - checker-qual-3.19.0.jar
+//        // - error_prone_annotations-2.10.0.jar
+//      )
+//      val cp = (assembly / fullClasspath).value
+//
+//      // Return `true` when we want the jar `f` to be excluded from the assembly jar
+//      cp.filter { f =>
+//        val doExclude = !allowedJars.contains(f.data.getName)
+//        println(s"Excluding jar: ${f.data.getName} ? $doExclude")
+//        doExclude
+//      }
+//    },
+//    assembly / assemblyMergeStrategy := {
+//      // Project iceberg `dependsOn` spark and accidentally brings in it, along with its
+//      // compile-time dependencies (like delta-storage). We want these excluded from the
+//      // delta-iceberg jar.
+//      case PathList("io", "delta", xs @ _*) =>
+//        // - delta-storage will bring in classes: io/delta/storage
+//        // - delta-spark will bring in classes: io/delta/exceptions/, io/delta/implicits,
+//        //   io/delta/package, io/delta/sql, io/delta/tables,
+//        println(s"Discarding class: io/delta/${xs.mkString("/")}")
+//        MergeStrategy.discard
+//      case PathList("com", "databricks", xs @ _*) =>
+//        // delta-spark will bring in com/databricks/spark/util
+//        println(s"Discarding class: com/databricks/${xs.mkString("/")}")
+//        MergeStrategy.discard
+//      case PathList("org", "apache", "spark", xs @ _*)
+//        if !deltaIcebergSparkIncludePrefixes.exists { prefix =>
+//          s"org/apache/spark/${xs.mkString("/")}".startsWith(prefix) } =>
+//        println(s"Discarding class: org/apache/spark/${xs.mkString("/")}")
+//        MergeStrategy.discard
+//      case x =>
+//        println(s"Including class: $x")
+//        (assembly / assemblyMergeStrategy).value(x)
+//    },
+//    assemblyPackageScala / assembleArtifact := false
+//  )
 // scalastyle:on println
 
-lazy val generateIcebergJarsTask = TaskKey[Unit]("generateIcebergJars", "Generate Iceberg JARs")
-
-lazy val icebergShaded = (project in file("icebergShaded"))
-  .dependsOn(spark % "provided")
-  .settings (
-    name := "iceberg-shaded",
-    commonSettings,
-    skipReleaseSettings,
-
+//lazy val generateIcebergJarsTask = TaskKey[Unit]("generateIcebergJars", "Generate Iceberg JARs")
+//
+//lazy val icebergShaded = (project in file("icebergShaded"))
+//  .dependsOn(spark % "provided")
+//  .settings (
+//    name := "iceberg-shaded",
+//    commonSettings,
+//    skipReleaseSettings,
+//
+//    // Compile, patch and generated Iceberg JAGRs
+//    generateIcebergJarsTask := {
+//      import sys.process._
+//      val scriptPath = baseDirectory.value / "generate_iceberg_jars.py"
+//      // Download iceberg code in `iceberg_src` dir and generate the JARs in `lib` dir
+//      Seq("python3", scriptPath.getPath)!
+//    },
+//    Compile / unmanagedJars := (Compile / unmanagedJars).dependsOn(generateIcebergJarsTask).value,
+//    cleanFiles += baseDirectory.value / "iceberg_src",
+//    cleanFiles += baseDirectory.value / "lib",
+//
+//    // Generated shaded Iceberg JARs
+//    Compile / packageBin := assembly.value,
+//    assembly / assemblyJarName := s"${name.value}_${scalaBinaryVersion.value}-${version.value}.jar",
+//    assembly / logLevel := Level.Info,
+//    assembly / test := {},
+//    assembly / assemblyShadeRules := Seq(
+//      ShadeRule.rename("org.apache.iceberg.**" -> "shadedForDelta.@0").inAll,
+//    ),
+//    assemblyPackageScala / assembleArtifact := false,
+//    // Make the 'compile' invoke the 'assembly' task to generate the uber jar.
+//  )
+//
     // Compile, patch and generated Iceberg JARs
-    generateIcebergJarsTask := {
-      import sys.process._
-      val scriptPath = baseDirectory.value / "generate_iceberg_jars.py"
-      // Download iceberg code in `iceberg_src` dir and generate the JARs in `lib` dir
-      Seq("python3", scriptPath.getPath)!
-    },
-    Compile / unmanagedJars := (Compile / unmanagedJars).dependsOn(generateIcebergJarsTask).value,
-    cleanFiles += baseDirectory.value / "iceberg_src",
-    cleanFiles += baseDirectory.value / "lib",
+//    generateIcebergJarsTask := {
+//      import sys.process._
+//      val scriptPath = baseDirectory.value / "generate_iceberg_jars.py"
+//      // Download iceberg code in `iceberg_src` dir and generate the JARs in `lib` dir
+//      Seq("python3", scriptPath.getPath)!
+//    },
+//    Compile / unmanagedJars := (Compile / unmanagedJars).dependsOn(generateIcebergJarsTask).value,
+//    cleanFiles += baseDirectory.value / "iceberg_src",
+//    cleanFiles += baseDirectory.value / "lib",
+//
+//    // Generated shaded Iceberg JARs
+//    Compile / packageBin := assembly.value,
+//    assembly / assemblyJarName := s"${name.value}_${scalaBinaryVersion.value}-${version.value}.jar",
+//    assembly / logLevel := Level.Info,
+//    assembly / test := {},
+//    assembly / assemblyShadeRules := Seq(
+//      ShadeRule.rename("org.apache.iceberg.**" -> "shadedForDelta.@0").inAll,
+//    ),
+//    assemblyPackageScala / assembleArtifact := false,
+//    // Make the 'compile' invoke the 'assembly' task to generate the uber jar.
+//  )
 
-    // Generated shaded Iceberg JARs
-    Compile / packageBin := assembly.value,
-    assembly / assemblyJarName := s"${name.value}_${scalaBinaryVersion.value}-${version.value}.jar",
-    assembly / logLevel := Level.Info,
-    assembly / test := {},
-    assembly / assemblyShadeRules := Seq(
-      ShadeRule.rename("org.apache.iceberg.**" -> "shadedForDelta.@0").inAll,
-    ),
-    assemblyPackageScala / assembleArtifact := false,
-    // Make the 'compile' invoke the 'assembly' task to generate the uber jar.
-  )
 lazy val hive = (project in file("connectors/hive"))
   .dependsOn(standaloneCosmetic)
   .settings (
@@ -1084,7 +1109,7 @@ val createTargetClassesDir = taskKey[Unit]("create target classes dir")
 
 // Don't use these groups for any other projects
 lazy val sparkGroup = project
-  .aggregate(spark, contribs, storage, storageS3DynamoDB, iceberg, testDeltaIcebergJar)
+  .aggregate(spark, contribs, storage, storageS3DynamoDB)
   .settings(
     // crossScalaVersions must be set to Nil on the aggregating project
     crossScalaVersions := Nil,

@@ -24,14 +24,12 @@ import org.apache.spark.sql.delta.metering.DeltaLogging
 import org.apache.spark.sql.delta.sources.{DeltaSourceUtils, DeltaSQLConf}
 import org.apache.hadoop.fs.{FileSystem, Path}
 
-import org.apache.spark.sql.{Column, DataFrame}
 import org.apache.spark.sql.SparkSession
 import org.apache.spark.sql.catalyst.TableIdentifier
-import org.apache.spark.sql.catalyst.analysis.{NoSuchTableException, UnresolvedAttribute, UnresolvedLeafNode, UnresolvedTable}
+import org.apache.spark.sql.catalyst.analysis.{NoSuchTableException, UnresolvedTable}
 import org.apache.spark.sql.catalyst.catalog.{CatalogTable, SessionCatalog}
 import org.apache.spark.sql.catalyst.expressions._
 import org.apache.spark.sql.catalyst.expressions.objects.StaticInvoke
-import org.apache.spark.sql.catalyst.planning.NodeWithOnlyDeterministicProjectAndFilter
 import org.apache.spark.sql.catalyst.plans.logical.{Filter, LeafNode, LogicalPlan, Project}
 import org.apache.spark.sql.catalyst.util.CharVarcharCodegenUtils
 import org.apache.spark.sql.connector.catalog.Identifier
@@ -76,6 +74,14 @@ object DeltaFullTable {
     case DeltaRelation(lr) => unapply(lr)
     case _ =>
       None
+  }
+}
+
+object NodeWithOnlyDeterministicProjectAndFilter {
+  def unapply(plan: LogicalPlan): Option[LogicalPlan] = plan match {
+    case Project(projectList, child) if projectList.forall(_.deterministic) => unapply(child)
+    case Filter(cond, child) if cond.deterministic => unapply(child)
+    case _ => Some(plan)
   }
 }
 
@@ -381,10 +387,22 @@ object DeltaTableUtils extends PredicateHelper
         // Spark does char type read-side padding via an additional Project over the scan node.
         // `newOutput` references the Project attributes, we need to translate their expression IDs
         // so that `newOutput` references attributes from the LogicalRelation instead.
-        def hasCharPadding(e: Expression): Boolean = e.exists {
-          case s: StaticInvoke => s.staticObject == classOf[CharVarcharCodegenUtils] &&
-            s.functionName == "readSidePadding"
-          case _ => false
+        // def hasCharPadding(e: Expression): Boolean = e.exists {
+        //  case s: StaticInvoke => s.staticObject == classOf[CharVarcharCodegenUtils] &&
+        //    s.functionName == "readSidePadding"
+        //  case _ => false
+        // }
+
+        def hasCharPadding(e: Expression): Boolean = {
+
+          def matchCondition(e: Expression): Boolean = e match {
+            case s: StaticInvoke =>
+              s.staticObject == classOf[CharVarcharCodegenUtils] &&
+                s.functionName == "readSidePadding"
+            case _ => false
+          }
+
+          matchCondition(e) || e.children.exists(hasCharPadding)
         }
         val charColMapping = AttributeMap(projectList.collect {
           case a: Alias if hasCharPadding(a.child) && a.references.size == 1 =>
@@ -552,10 +570,12 @@ object DeltaTableUtils extends PredicateHelper
   }
 }
 
-sealed abstract class UnresolvedPathBasedDeltaTableBase(path: String) extends UnresolvedLeafNode {
+sealed abstract class UnresolvedPathBasedDeltaTableBase(path: String) extends LeafNode {
   def identifier: Identifier = Identifier.of(Array(DeltaSourceUtils.ALT_NAME), path)
   def deltaTableIdentifier: DeltaTableIdentifier = DeltaTableIdentifier(Some(path), None)
 
+  override lazy val resolved: Boolean = false
+  override val output: Seq[Attribute] = Nil
 }
 
 /** Resolves to a [[ResolvedTable]] if the DeltaTable exists */

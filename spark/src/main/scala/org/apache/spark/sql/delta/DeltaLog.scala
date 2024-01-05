@@ -41,7 +41,7 @@ import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs.{FileStatus, FileSystem, Path}
 
 import org.apache.spark.sql._
-import org.apache.spark.sql.catalyst.{FileSourceOptions, TableIdentifier}
+import org.apache.spark.sql.catalyst.TableIdentifier
 import org.apache.spark.sql.catalyst.analysis.{Resolver, UnresolvedAttribute}
 import org.apache.spark.sql.catalyst.catalog.{BucketSpec, CatalogStatistics, CatalogTable}
 import org.apache.spark.sql.catalyst.expressions.{And, Attribute, Cast, Expression, Literal}
@@ -660,8 +660,8 @@ object DeltaLog extends DeltaLogging {
     // entire table unusable. Hard-wire that into the file source options so the user can't override
     // it by setting spark.sql.files.ignoreCorruptFiles or spark.sql.files.ignoreMissingFiles.
     val allOptions = additionalOptions ++ formatSpecificOptions ++ Map(
-      FileSourceOptions.IGNORE_CORRUPT_FILES -> "false",
-      FileSourceOptions.IGNORE_MISSING_FILES -> "false"
+      "ignoreCorruptFiles" -> "false",
+      "ignoreMissingFiles" -> "false"
     )
     val fsRelation = HadoopFsRelation(
       index, index.partitionSchema, schema, None, index.format, allOptions)(spark)

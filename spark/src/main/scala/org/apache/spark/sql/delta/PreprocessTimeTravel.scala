@@ -17,14 +17,11 @@
 package org.apache.spark.sql.delta
 
 import org.apache.spark.sql.catalyst.TimeTravel
-import org.apache.spark.sql.delta.catalog.DeltaTableV2
-import org.apache.hadoop.fs.Path
-
 import org.apache.spark.sql.SparkSession
 import org.apache.spark.sql.catalyst.analysis.{EliminateSubqueryAliases, ResolvedTable, UnresolvedRelation}
 import org.apache.spark.sql.catalyst.plans.logical._
 import org.apache.spark.sql.catalyst.rules.Rule
-import org.apache.spark.sql.execution.datasources.v2.DataSourceV2Relation
+import org.apache.spark.sql.catalyst.util.quoteIfNeeded
 import org.apache.spark.sql.internal.SQLConf
 
 /**
@@ -78,7 +75,8 @@ case class PreprocessTimeTravel(sparkSession: SparkSession) extends Rule[Logical
       case _ =>
         // If the identifier doesn't exist as a table, try resolving it as a path table.
         ResolveDeltaPathTable.resolveAsPathTableRelation(sparkSession, ur).getOrElse {
-          ur.tableNotFound(ur.multipartIdentifier)
+          ur.failAnalysis(msg = s"Table not found: " +
+            s"${ur.multipartIdentifier.map(quoteIfNeeded).mkString(".")}")
         }
     }
   }

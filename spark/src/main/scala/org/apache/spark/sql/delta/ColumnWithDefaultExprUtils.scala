@@ -27,11 +27,11 @@ import org.apache.spark.sql.delta.schema.SchemaUtils
 import org.apache.spark.sql.delta.sources.{DeltaSourceUtils, DeltaSQLConf}
 
 import org.apache.spark.sql.{Column, DataFrame, Dataset, Encoder}
-import org.apache.spark.sql.catalyst.encoders.ExpressionEncoder
+import org.apache.spark.sql.catalyst.encoders.RowEncoder
 import org.apache.spark.sql.catalyst.expressions.EqualNullSafe
 import org.apache.spark.sql.catalyst.util.CaseInsensitiveMap
 import org.apache.spark.sql.execution.QueryExecution
-import org.apache.spark.sql.execution.streaming.{IncrementalExecution, StreamExecution}
+import org.apache.spark.sql.execution.streaming.IncrementalExecution
 import org.apache.spark.sql.types.{MetadataBuilder, StructField, StructType}
 
 /**
@@ -210,9 +210,7 @@ object ColumnWithDefaultExprUtils extends DeltaLogging {
       incrementalExecution.queryId,
       incrementalExecution.runId,
       incrementalExecution.currentBatchId,
-      incrementalExecution.prevOffsetSeqMetadata,
-      incrementalExecution.offsetSeqMetadata,
-      incrementalExecution.watermarkPropagator
+      incrementalExecution.offsetSeqMetadata
     )
     newIncrementalExecution.executedPlan // Force the lazy generation of execution plan
 
@@ -222,6 +220,6 @@ object ColumnWithDefaultExprUtils extends DeltaLogging {
       classOf[Dataset[_]].getConstructor(classOf[QueryExecution], classOf[Encoder[_]])
     constructor.newInstance(
       newIncrementalExecution,
-      ExpressionEncoder(newIncrementalExecution.analyzed.schema)).asInstanceOf[DataFrame]
+      RowEncoder(newIncrementalExecution.analyzed.schema)).asInstanceOf[DataFrame]
   }
 }

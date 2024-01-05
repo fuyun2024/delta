@@ -58,11 +58,8 @@ import org.apache.spark.sql.catalyst.expressions.{Expression, Literal}
 import org.apache.spark.sql.catalyst.{FunctionIdentifier, TableIdentifier}
 import org.apache.spark.sql.catalyst.analysis._
 import org.apache.spark.sql.catalyst.parser.{ParseErrorListener, ParseException, ParserInterface}
-import org.apache.spark.sql.catalyst.parser.ParserUtils.{string, withOrigin}
 import org.apache.spark.sql.catalyst.plans.logical.{AlterTableAddConstraint, AlterTableDropConstraint, AlterTableDropFeature, CloneTableStatement, LogicalPlan, RestoreTableStatement}
 import org.apache.spark.sql.catalyst.trees.Origin
-import org.apache.spark.sql.connector.catalog.{CatalogV2Util, TableCatalog}
-import org.apache.spark.sql.errors.QueryParsingErrors
 import org.apache.spark.sql.internal.{SQLConf, VariableSubstitution}
 import org.apache.spark.sql.types._
 
@@ -80,12 +77,6 @@ class DeltaSqlParser(val delegate: ParserInterface) extends ParserInterface {
       case _ => delegate.parsePlan(sqlText)
     }
   }
-
-  /**
-   * This API is used just for parsing the SELECT queries. Delta parser doesn't override
-   * the Spark parser, that means this can be delegated directly to the Spark parser.
-   */
-  override def parseQuery(sqlText: String): LogicalPlan = delegate.parseQuery(sqlText)
 
   // scalastyle:off line.size.limit
   /**
@@ -257,7 +248,7 @@ class DeltaSqlAstBuilder extends DeltaSqlBaseBaseVisitor[AnyRef] {
       case replaceHeader: ReplaceTableHeaderContext =>
         (visitTableIdentifier(replaceHeader.table), replaceHeader.CREATE() != null, true, false)
       case _ =>
-        throw new DeltaParseException("Incorrect CLONE header expected REPLACE or CREATE table", ctx)
+        throw new ParseException("Incorrect CLONE header expected REPLACE or CREATE table", ctx)
     }
   }
 
@@ -273,7 +264,7 @@ class DeltaSqlAstBuilder extends DeltaSqlBaseBaseVisitor[AnyRef] {
     val (target, isCreate, isReplace, ifNotExists) = visitCloneTableHeader(ctx.cloneTableHeader())
 
     if (!isCreate && ifNotExists) {
-      throw new DeltaParseException(
+      throw new ParseException(
         "IF NOT EXISTS cannot be used together with REPLACE", ctx.cloneTableHeader())
     }
 
@@ -340,7 +331,7 @@ class DeltaSqlAstBuilder extends DeltaSqlBaseBaseVisitor[AnyRef] {
    */
   override def visitOptimizeTable(ctx: OptimizeTableContext): AnyRef = withOrigin(ctx) {
     if (ctx.path == null && ctx.table == null) {
-      throw new DeltaParseException("OPTIMIZE command requires a file path or table name.", ctx)
+      throw new ParseException("OPTIMIZE command requires a file path or table name.", ctx)
     }
     val interleaveBy = Option(ctx.zorderSpec).map(visitZorderSpec).getOrElse(Seq.empty)
     OptimizeTableCommand(
@@ -427,8 +418,8 @@ class DeltaSqlAstBuilder extends DeltaSqlBaseBaseVisitor[AnyRef] {
       case Seq(tbl) => TableIdentifier(tbl.getText)
       case Seq(db, tbl) => TableIdentifier(tbl.getText, Some(db.getText))
       case Seq(catalog, db, tbl) =>
-        TableIdentifier(tbl.getText, Some(db.getText), Some(catalog.getText))
-      case _ => throw new DeltaParseException(s"Illegal table name ${ctx.getText}", ctx)
+        TableIdentifier(tbl.getText, Some(db.getText))
+      case _ => throw new ParseException(s"Illegal table name ${ctx.getText}", ctx)
     }
   }
 
@@ -547,7 +538,7 @@ class DeltaSqlAstBuilder extends DeltaSqlBaseBaseVisitor[AnyRef] {
       case ("interval", Nil) => CalendarIntervalType
       case (dt, params) =>
         val dtStr = if (params.nonEmpty) s"$dt(${params.mkString(",")})" else dt
-        throw new DeltaParseException(s"DataType $dtStr is not supported.", ctx)
+        throw new ParseException(s"DataType $dtStr is not supported.", ctx)
     }
   }
 }

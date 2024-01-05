@@ -30,7 +30,6 @@ import org.apache.spark.sql.catalyst.catalog.{CatalogTable, CatalogTableType}
 import org.apache.spark.sql.catalyst.expressions.Attribute
 import org.apache.spark.sql.catalyst.plans.logical.LogicalPlan
 import org.apache.spark.sql.catalyst.trees.UnaryLike
-import org.apache.spark.sql.catalyst.types.DataTypeUtils.toAttributes
 import org.apache.spark.sql.execution.command.RunnableCommand
 import org.apache.spark.sql.types.StructType
 
@@ -75,7 +74,7 @@ case class DescribeDeltaDetailCommand(
     with DeltaLogging
     with DeltaCommand
 {
-  override val output: Seq[Attribute] = toAttributes(TableDetail.schema)
+  override val output: Seq[Attribute] = TableDetail.schema.toAttributes
 
   override protected def withNewChildInternal(newChild: LogicalPlan): DescribeDeltaDetailCommand =
     copy(child = newChild)

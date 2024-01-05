@@ -27,7 +27,6 @@ import org.apache.spark.sql.catalyst.analysis.{MultiInstanceRelation, Unresolved
 import org.apache.spark.sql.catalyst.encoders.ExpressionEncoder
 import org.apache.spark.sql.catalyst.expressions.{Attribute, AttributeSet}
 import org.apache.spark.sql.catalyst.plans.logical.{LogicalPlan, Project, UnaryNode}
-import org.apache.spark.sql.catalyst.types.DataTypeUtils.toAttributes
 import org.apache.spark.sql.execution.command.LeafRunnableCommand
 
 object DescribeDeltaHistory {
@@ -61,7 +60,7 @@ object DescribeDeltaHistory {
 case class DescribeDeltaHistory(
     override val child: LogicalPlan,
     limit: Option[Int],
-    override val output: Seq[Attribute] = toAttributes(ExpressionEncoder[DeltaHistory]().schema))
+    override val output: Seq[Attribute] = ExpressionEncoder[DeltaHistory]().schema.toAttributes)
   extends UnaryNode
     with MultiInstanceRelation
     with DeltaCommand {
@@ -96,7 +95,7 @@ case class DescribeDeltaHistory(
 case class DescribeDeltaHistoryCommand(
     @transient table: DeltaTableV2,
     limit: Option[Int],
-    override val output: Seq[Attribute] = toAttributes(ExpressionEncoder[DeltaHistory]().schema))
+    override val output: Seq[Attribute] = ExpressionEncoder[DeltaHistory]().schema.toAttributes)
   extends LeafRunnableCommand
     with MultiInstanceRelation
     with DeltaLogging {

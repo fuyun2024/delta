@@ -39,6 +39,7 @@ trait DeltaColumnMappingBase extends DeltaLogging {
   val COLUMN_MAPPING_METADATA_PREFIX = "delta.columnMapping."
   val COLUMN_MAPPING_METADATA_ID_KEY = COLUMN_MAPPING_METADATA_PREFIX + "id"
   val COLUMN_MAPPING_PHYSICAL_NAME_KEY = COLUMN_MAPPING_METADATA_PREFIX + "physicalName"
+  val ROW_INDEX_TEMPORARY_COLUMN_NAME = "_tmp_metadata_row_index"
 
   /**
    * This list of internal columns (and only this list) is allowed to have missing
@@ -65,7 +66,7 @@ trait DeltaColumnMappingBase extends DeltaLogging {
        * data schema plus additional custom metadata columns required from file format to fill up
        * the `_metadata` column.
        */
-      ParquetFileFormat.ROW_INDEX_TEMPORARY_COLUMN_NAME,
+      ROW_INDEX_TEMPORARY_COLUMN_NAME,
       DeltaParquetFileFormat.IS_ROW_DELETED_COLUMN_NAME,
       DeltaParquetFileFormat.ROW_INDEX_COLUMN_NAME)
     ).map(_.toLowerCase(Locale.ROOT)).toSet

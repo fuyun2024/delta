@@ -39,8 +39,8 @@ import org.apache.spark.paths.SparkPath
 import org.apache.spark.sql._
 import org.apache.spark.sql.catalyst.expressions.{AttributeReference, Expression}
 import org.apache.spark.sql.catalyst.plans.logical.{LogicalPlan, Project}
-import org.apache.spark.sql.execution.datasources.{HadoopFsRelation, LogicalRelation}
-import org.apache.spark.sql.execution.datasources.FileFormat.{FILE_PATH, METADATA_NAME}
+import org.apache.spark.sql.delta.commands.DMLWithDeletionVectorsHelper.{FILE_PATH, METADATA_NAME}
+import org.apache.spark.sql.execution.datasources.{FileFormat, HadoopFsRelation, LogicalRelation}
 import org.apache.spark.sql.functions.{col, lit}
 import org.apache.spark.sql.types.StructType
 import org.apache.spark.util.{SerializableConfiguration, Utils => SparkUtils}
@@ -51,6 +51,11 @@ import org.apache.spark.util.{SerializableConfiguration, Utils => SparkUtils}
  */
 object DMLWithDeletionVectorsHelper extends DeltaCommand {
   val SUPPORTED_DML_COMMANDS: Seq[String] = Seq("DELETE", "UPDATE")
+
+  val FILE_PATH = "file_path"
+
+  val METADATA_NAME = "_metadata"
+
 
   /**
    * Creates a DataFrame that can be used to scan for rows matching the condition in the given
@@ -77,16 +82,16 @@ object DMLWithDeletionVectorsHelper extends DeltaCommand {
    * @param fileIndex the new file index
    */
   private def replaceFileIndex(target: LogicalPlan, fileIndex: TahoeFileIndex): LogicalPlan = {
-    val rowIndexCol = AttributeReference(ROW_INDEX_COLUMN_NAME, ROW_INDEX_STRUCT_FILED.dataType)();
-    var fileMetadataCol: AttributeReference = null
+    val additionalCols = Seq(
+      AttributeReference(ROW_INDEX_COLUMN_NAME, ROW_INDEX_STRUCT_FILED.dataType)()
+    )
 
-    val newTarget = target.transformUp {
-      case l @ LogicalRelation(
-        hfsr @ HadoopFsRelation(_, _, _, _, format: DeltaParquetFileFormat, _), _, _, _) =>
-        fileMetadataCol = format.createFileMetadataCol()
+    val newTarget = target transformDown {
+      case l@LogicalRelation(
+      hfsr@HadoopFsRelation(_, _, _, _, format: DeltaParquetFileFormat, _), _, _, _) =>
         // Take the existing schema and add additional metadata columns
         val newDataSchema = StructType(hfsr.dataSchema).add(ROW_INDEX_STRUCT_FILED)
-        val finalOutput = l.output ++ Seq(rowIndexCol, fileMetadataCol)
+        val finalOutput = l.output ++ additionalCols
         // Disable splitting and filter pushdown in order to generate the row-indexes
         val newFormat = format.copy(isSplittable = false, disablePushDowns = true)
 
@@ -97,10 +102,7 @@ object DMLWithDeletionVectorsHelper extends DeltaCommand {
 
         l.copy(relation = newBaseRelation, output = finalOutput)
       case p @ Project(projectList, _) =>
-        if (fileMetadataCol == null) {
-          throw new IllegalStateException("File metadata column is not yet created.")
-        }
-        val newProjectList = projectList ++ Seq(rowIndexCol, fileMetadataCol)
+        val newProjectList = projectList ++ additionalCols
         p.copy(projectList = newProjectList)
     }
     newTarget

@@ -16,8 +16,8 @@
 
 package org.apache.spark.sql.delta
 
-import org.apache.spark.sql.SparkSession
-import org.apache.spark.sql.catalyst.analysis.RelationTimeTravel
+import org.apache.spark.sql.{AnalysisException, SparkSession}
+import org.apache.spark.sql.catalyst.analysis.{RelationTimeTravel, UnresolvedRelation}
 import org.apache.spark.sql.catalyst.plans.logical.LogicalPlan
 import org.apache.spark.sql.catalyst.trees.TreePattern.RELATION_TIME_TRAVEL
 
@@ -31,7 +31,13 @@ class CheckUnresolvedRelationTimeTravel(spark: SparkSession) extends (LogicalPla
     // Short circuit: We only care about (unresolved) plans containing [[RelationTimeTravel]].
     if (plan.containsPattern(RELATION_TIME_TRAVEL)) {
       plan.foreachUp {
-        case tt: RelationTimeTravel => spark.sessionState.analyzer.checkAnalysis0(tt.relation)
+        case tt: RelationTimeTravel =>
+          // Check if `tt.relation` is unresolved
+          if (tt.relation.isInstanceOf[UnresolvedRelation]) {
+            // You can choose your action here, e.g., logging a warning or throwing an exception
+            val message = s"Found unresolved relation in time travel: ${tt.relation}"
+            throw new AnalysisException(message)
+          }
         case _ => ()
       }
     }
